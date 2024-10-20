@@ -1,0 +1,66 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title> Leaflet Map with Centralities</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+</head>
+<body>
+    <div id="map" style="height:100vh;"></div>
+
+    <script>
+        // Créer une carte Leaflet
+        var map = L.map('map').setView([39.70, 116.60], 10);
+
+        // Ajouter un fond de carte OpenStreetMap
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // Lire les données à partir d'un fichier JSON et afficher les marqueurs sur la carte
+        fetch('results.json')
+            .then(response => response.json())
+            .then(data => {
+                // Parcourir les données et ajouter des marqueurs à la carte
+                data.forEach(entry => {
+                    var lat = parseFloat(entry.CoorY);
+                    var lon = parseFloat(entry.CoorX);
+                    var centrality = entry.Centrality;
+                    var color = getColor(centrality);
+
+                    console.log("Latitude:", lat, "Longitude:", lon); 
+                    if (!isNaN(lat) && !isNaN(lon)) 
+                    {
+                        // Ajouter un marqueur à la position spécifiée
+                        var circle = L.circleMarker([lat, lon], {
+                            color: color,
+                            fillColor: color,
+                            fillOpacity: 0.5,
+                            radius: centrality/2 // Modifier la taille du marqueur ici
+                        }).addTo(map);
+                        circle.bindPopup("Nombre Taxi : " + centrality);
+                    } 
+                    else 
+                        console.error("Erreur : Coordonnées non valides - ", entry);
+                });
+            })
+            .catch(error => console.error('Erreur lors du chargement des données JSON:', error));
+
+        // Fonction pour obtenir la couleur en fonction de la centralité
+        function getColor(centrality) 
+        {
+            if (centrality >= 40) 
+                return 'red';
+            else if (centrality >= 20) 
+                    return 'orange';
+                 else if (centrality >= 10) 
+                        return 'yellow';
+                      else 
+                            return 'green';
+        }
+    </script>
+</body>
+</html>

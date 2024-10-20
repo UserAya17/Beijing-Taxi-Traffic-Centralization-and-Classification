@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Geolocation</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.8.0/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+        
+        .legend {
+            padding: 10px;
+            font-size: 14px;
+            background: white;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            z-index: 1000;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="map" style="width:100%; height: 100vh"></div>
+    <div class="legend" id="legend"></div>
+    <script src="https://unpkg.com/leaflet@1.8.0/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
+    <script>
+        var map = L.map('map').setView([28.2380, 83.9956], 11);
+        mapLink = "<a href='http://openstreetmap.org'>OpenStreetMap</a>";
+        L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', { attribution: 'Leaflet © ' + mapLink + ', contribution', maxZoom: 18 }).addTo(map);
+
+        // Lire les données à partir d'un fichier JSON et afficher les marqueurs sur la carte
+        fetch('2.json')
+            .then(response => response.json())
+            .then(data => {
+                // Initialiser un objet pour stocker les marqueurs et les coordonnées de chaque jour
+                var markersByDay = {};
+
+                // Parcourir les données pour créer des marqueurs et des coordonnées pour chaque jour
+                data.forEach(entry => {
+                    var lat = parseFloat(entry.lat);
+                    var lon = parseFloat(entry.lon);
+                    var date = entry.date.split(' ')[0]; // Extraire la date sans l'heure
+
+                    // Ajouter un marqueur de position à la position spécifiée
+                    var marker = L.marker([lat, lon]).addTo(map);
+
+                    // Ajouter un popup indiquant la date lorsque vous cliquez sur le marqueur
+                    marker.bindPopup("Jour : " + date);
+
+                    // Si la date n'existe pas encore dans l'objet, l'initialiser avec un tableau vide
+                    if (!(date in markersByDay)) {
+                        markersByDay[date] = {
+                            color: getRandomColor(),
+                            coordinates: []
+                        };
+                    }
+
+                    // Ajouter les coordonnées à la liste des coordonnées pour ce jour
+                    markersByDay[date].coordinates.push([lon, lat]);
+                });
+
+                // Liste des couleurs disponibles
+                var colors = ['red', 'blue', 'green', 'purple', 'orange', 'cyan', 'magenta'];
+
+                // Créer un itinéraire pour chaque jour avec une couleur différente
+                Object.keys(markersByDay).forEach((date, index) => {
+                    L.Routing.control({
+                        waypoints: markersByDay[date].coordinates.map(coord => L.latLng(coord[0], coord[1])),
+                        routeWhileDragging: true,
+                        lineOptions: { styles: [{ color: markersByDay[date].color, opacity: 0.8, weight: 6 }] }
+                    }).addTo(map);
+
+                    // Ajouter la légende
+                    addLegend(date, markersByDay[date].color);
+                });
+            })
+            .catch(error => console.error('Erreur lors du chargement des données JSON:', error));
+
+        function getRandomColor() {
+            var letters = '0123456789ABCDEF';
+            var color = '#';
+            for (var i = 0; i < 6; i++) {
+                color += letters[Math.floor(Math.random() * 16)];
+            }
+            return color;
+        }
+
+        function addLegend(label, color) {
+            var legend = document.getElementById('legend');
+            var legendItem = document.createElement('div');
+            legendItem.className = 'legend-item';
+            legendItem.innerHTML = '<div class="legend-color" style="background-color: ' + color + '"></div><div>' + label + '</div>';
+            legend.appendChild(legendItem);
+        }
+    </script>
+</body>
+
+</html>

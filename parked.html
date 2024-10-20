@@ -1,0 +1,220 @@
+<!--<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title> Leaflet Map with Centralities</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+</head>
+<body>
+    <div id="map" style="height: 100vh;"></div>
+
+    <script>
+        // Initialiser la carte  (2) [116.57156, 39.90263]
+        var map = L.map('map').setView([28.2380, 83.9956], 11);
+        mapLink = "<a href='http://openstreetmap.org'>OpenStreetMap</a>";
+        // Ajouter un fond de carte OpenStreetMap
+        L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', { attribution: 'Leaflet © ' + mapLink + ', contribution', maxZoom: 18 }).addTo(map);
+
+        fetch('1.json')
+            .then(response => response.json())
+            .then(data => {
+            // Parcourir les données
+            for(let i = 0; i < data.length - 1; i++) {
+                let point1 = data[i];
+                let point2 = data[i+1];
+
+                // Convertir les dates en objets Date
+                let date1 = new Date(point1.date);
+                let date2 = new Date(point2.date);
+
+                let dateOnly1 = new Date(date1.getFullYear(), date1.getMonth(), date1.getDate());
+                let dateOnly2 = new Date(date2.getFullYear(), date2.getMonth(), date2.getDate());
+            // Comparer les dates
+                if(dateOnly1.getDate() === dateOnly2.getDate()) 
+                {
+                    // Calculer la différence de temps en minutes
+                let diff = (date2 - date1) / 1000 / 60;
+                console.log("diff = " + diff);
+                if(diff >= 20 && Math.floor(point1.lat * 100) == Math.floor(point2.lat * 100) && Math.floor(point1.lon * 100) == Math.floor(point2.lon * 100)) {
+                    console.log("stationary");
+                    L.circleMarker([point1.lon, point1.lat], {
+                        color: 'green',
+                            fillColor: 'green',
+                            fillOpacity: 0.5,
+                            radius: 20 }).addTo(map);
+                } 
+                else 
+                {
+                   console.log("moving");
+                   console.log([point1.lat, point1.lon]);
+                   var circle = L.circleMarker([point1.lon, point1.lat], {
+                            color: 'blue',
+                            fillColor: 'blue',
+                            fillOpacity: 0.5,
+                            radius: 10
+                        }).addTo(map);
+                }
+                } 
+                else 
+                {
+                    console.log("Les deux lignes ont des dates différentes.");
+                }   
+            }
+        });
+    </script>
+</body>
+</html>-->
+
+
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leaflet Map with Shortest Path (A*)</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+</head>
+<body>
+    <div id="map" style="height: 100vh;"></div>
+
+    <script>
+        var map = L.map('map').setView([28.2380, 83.9956], 11);
+        mapLink = "<a href='http://openstreetmap.org'>OpenStreetMap</a>";
+        L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', { attribution: 'Leaflet © ' + mapLink + ', contribution', maxZoom: 18 }).addTo(map);
+
+        // Charger les données à partir du fichier JSON
+        fetch('1.json')
+        .then(response => response.json())
+        .then(data => {
+            // Créer une liste de points le long de la trajectoire du taxi
+            var points = data.map(point => [point.lon, point.lat]);
+
+            // Créer des lignes à partir des points
+            var polyline = L.polyline(points, {color: 'blue'}).addTo(map);
+
+            // Ajouter les points en tant que marqueurs pour aider à la sélection des points de départ et d'arrivée
+            points.forEach(point => {
+                L.marker(point).addTo(map);
+            });
+
+            // Ajouter des gestionnaires d'événements pour sélectionner les points de départ et d'arrivée
+            var startMarker = null;
+            var endMarker = null;
+
+            map.on('click', function(e) 
+            {
+                if (!startMarker) 
+                {
+                    startMarker = L.marker(e.latlng).addTo(map);
+                    const lat = startMarker.getLatLng().lat;
+        const lng = startMarker.getLatLng().lng;
+
+        // Afficher les coordonnées dans la console
+        console.log("Coordonnées du marqueur de départ - Latitude:", lat, "Longitude:", lng);
+                } 
+                else if (!endMarker) 
+                {
+                    endMarker = L.marker(e.latlng).addTo(map);
+                    // Calculer le chemin le plus court entre les points de départ et d'arrivée
+                    calculateShortestPath(startMarker.getLatLng(), endMarker.getLatLng(), points);
+                }
+            });
+        });
+
+        function calculateShortestPath(start, end, points) 
+        {
+            // Fonction de calcul du chemin le plus court avec l'algorithme A*
+            function AStar(start, end, graph) 
+            {
+                var openSet = [start];
+                var cameFrom = {};
+                var gScore = {};
+                var fScore = {};
+
+                gScore[start] = 0;
+                fScore[start] = heuristic(start, end);
+
+                while (openSet.length > 0) 
+                {
+                    var current = openSet.reduce((minNode, node) => (fScore[node] < fScore[minNode] ? node : minNode), openSet[0]);
+
+                    if (current[0] === end[0] && current[1] === end[1]) 
+                    {
+                        return reconstructPath(cameFrom, end);
+                    }
+
+                    openSet = openSet.filter(node => !(node[0] === current[0] && node[1] === current[1]));
+
+                    graph[current].forEach(neighbor => {
+                        var tentative_gScore = gScore[current] + 1; // Assuming each edge has a weight of 1
+
+                        if (!gScore.hasOwnProperty(neighbor) || tentative_gScore < gScore[neighbor]) {
+                            cameFrom[neighbor] = current;
+                            gScore[neighbor] = tentative_gScore;
+                            fScore[neighbor] = gScore[neighbor] + heuristic(neighbor, end);
+
+                            if (!openSet.includes(neighbor)) {
+                                openSet.push(neighbor);
+                            }
+                        }
+                    });
+                }
+
+                return null; // No path found
+            }
+
+            // Fonction d'heuristique (distance euclidienne)
+            function heuristic(a, b) {
+                return Math.sqrt(Math.pow(b.lat - a.lat, 2) + Math.pow(b.lon - a.lon, 2));
+            }
+
+            // Fonction de reconstruction du chemin
+            function reconstructPath(cameFrom, current) 
+            {
+                var totalPath = [current];
+                while (cameFrom[current]) 
+                {
+                    current = cameFrom[current];
+                    totalPath.push(current);
+                }
+                return totalPath.reverse();
+            }
+
+            // Construire le graphe à partir des points
+            var graph = {};
+
+            points.forEach((point, index) => {
+                graph[point] = [];
+                if (index > 0) {
+                    graph[point].push(points[index - 1]);
+                }
+                if (index < points.length - 1)
+                {
+                    graph[point].push(points[index + 1]);
+                    }
+                    });
+        // Calculer le chemin le plus court
+        var shortestPath = AStar(start, end, graph);
+
+        // Dessiner le chemin le plus court sur la carte
+        if (shortestPath) 
+        {
+            shortestPath.forEach(point => {
+    console.log("Latitude:", point.lat);
+    console.log("Longitude:", point.lng);
+});
+           
+            var polyline = L.polyline(shortestPath, {color: 'red'}).addTo(map);
+        } 
+        else 
+        {
+            alert('Aucun chemin trouvé entre les points sélectionnés.');
+        }
+    }
+</script>
+</body>
+</html>
